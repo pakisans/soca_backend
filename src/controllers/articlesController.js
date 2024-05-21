@@ -8,7 +8,6 @@ export async function getAllArticles(req, res) {
       articles: articles,
     };
     res.json(response);
-    console.log(articles);
   } catch (error) {
     res.status(500).send(error.message);
   }
@@ -38,6 +37,40 @@ export async function getArticlesWithoutProperImage(req, res) {
   } catch (error) {
     res.status(500).send({
       message: 'Error fetching articles with invalid images',
+      error: error.message,
+    });
+  }
+}
+
+export async function getArticlesByCategory(req, res) {
+  try {
+    const { kategorija, pretraga, sifra, page = 1, limit = 20 } = req.query;
+
+    const articles = await ArticleModel.getArticlesByCategory({
+      categoryName: kategorija,
+      searchQuery: pretraga,
+      productCode: sifra,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
+
+    const totalArticles = await ArticleModel.getTotalArticlesCount({
+      categoryName: kategorija,
+      searchQuery: pretraga,
+      productCode: sifra,
+    });
+
+    const response = {
+      count: totalArticles,
+      articles: articles,
+      totalPages: Math.ceil(totalArticles / limit),
+      currentPage: page,
+    };
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).send({
+      message: 'Error fetching articles by category',
       error: error.message,
     });
   }
