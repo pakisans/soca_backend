@@ -1,3 +1,4 @@
+import { logger } from '../config/logger.js';
 import * as ArticleModel from '../models/articleModel.js';
 
 export async function getAllArticles(req, res) {
@@ -44,20 +45,19 @@ export async function getArticlesWithoutProperImage(req, res) {
 
 export async function getArticlesByCategory(req, res) {
   try {
-    const { kategorija, pretraga, sifra, page = 1, limit = 20 } = req.query;
-
+    let { kategorija, grupa, page = 1, limit = 20 } = req.query;
+    kategorija = decodeURIComponent(kategorija || '').toLowerCase();
+    grupa = decodeURIComponent(grupa || '').toLowerCase();
     const articles = await ArticleModel.getArticlesByCategory({
-      categoryName: kategorija,
-      searchQuery: pretraga,
-      productCode: sifra,
+      categoryName: kategorija.replace(/-/g, ' '),
+      groupName: grupa.replace(/-/g, ' '),
       page: parseInt(page),
       limit: parseInt(limit),
     });
 
     const totalArticles = await ArticleModel.getTotalArticlesCount({
-      categoryName: kategorija,
-      searchQuery: pretraga,
-      productCode: sifra,
+      categoryName: kategorija.replace(/-/g, ' '),
+      groupName: grupa.replace(/-/g, ' '),
     });
 
     const response = {
@@ -69,6 +69,7 @@ export async function getArticlesByCategory(req, res) {
 
     res.json(response);
   } catch (error) {
+    logger.error('Error in getAllArticles: ', error);
     res.status(500).send({
       message: 'Error fetching articles by category',
       error: error.message,

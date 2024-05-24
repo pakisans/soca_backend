@@ -30,42 +30,54 @@ export async function getCategoryIdByName(categoryName) {
   return rows[0] ? rows[0].id : null;
 }
 
-export async function getArticlesByCategory({
-  categoryId,
-  searchQuery,
-  productCode,
-  categoryName,
-  page = 1,
-  limit = 10,
-}) {
+export async function getTotalArticlesCount({ categoryName, groupName }) {
+  let query = `
+    SELECT COUNT(a.id) as total
+    FROM artikli a
+    LEFT JOIN kategorije_grupe kg ON a.sifra LIKE CONCAT(kg.grupa, '%')
+    LEFT JOIN kategorije k ON kg.kategorija_id = k.id
+    WHERE 1=1
+  `;
+  const queryParams = [];
+
   if (categoryName) {
-    categoryId = await getCategoryIdByName(categoryName);
+    query += ' AND k.naziv = ?';
+    queryParams.push(categoryName);
   }
 
+  if (groupName) {
+    query += ' AND kg.naziv = ?';
+    queryParams.push(groupName);
+  }
+
+  const [rows] = await pool.query(query, queryParams);
+  return rows[0].total;
+}
+
+export async function getArticlesByCategory({
+  categoryName,
+  groupName,
+  page,
+  limit,
+}) {
   const offset = (page - 1) * limit;
   let query = `
     SELECT a.*
     FROM artikli a
-    LEFT JOIN artikli_u_kategoriji ak ON a.id = ak.artikl_id
-    LEFT JOIN kategorije k ON ak.kategorija_id = k.id
+    LEFT JOIN kategorije_grupe kg ON a.sifra LIKE CONCAT(kg.grupa, '%')
+    LEFT JOIN kategorije k ON kg.kategorija_id = k.id
     WHERE 1=1
   `;
-
   const queryParams = [];
-
-  if (categoryId) {
-    query += ' AND (k.id = ? OR k.parent_id = ?)';
-    queryParams.push(categoryId, categoryId);
+  console.log('off', categoryName, groupName);
+  if (categoryName) {
+    query += ' AND k.naziv = ?';
+    queryParams.push(categoryName);
   }
 
-  if (searchQuery) {
-    query += ' AND a.naziv LIKE ?';
-    queryParams.push(`%${searchQuery}%`);
-  }
-
-  if (productCode) {
-    query += ' AND a.sifra LIKE ?';
-    queryParams.push(`%${productCode}%`);
+  if (groupName) {
+    query += ' AND kg.naziv = ?';
+    queryParams.push(groupName);
   }
 
   query += ' LIMIT ? OFFSET ?';
@@ -93,43 +105,4 @@ export async function getArticlesByCategory({
     };
   });
   return articlesWithImageUrl;
-}
-
-export async function getTotalArticlesCount({
-  categoryId,
-  searchQuery,
-  productCode,
-  categoryName,
-}) {
-  if (categoryName) {
-    categoryId = await getCategoryIdByName(categoryName);
-  }
-
-  let query = `
-    SELECT COUNT(a.id) as total
-    FROM artikli a
-    LEFT JOIN artikli_u_kategoriji ak ON a.id = ak.artikl_id
-    LEFT JOIN kategorije k ON ak.kategorija_id = k.id
-    WHERE 1=1
-  `;
-
-  const queryParams = [];
-
-  if (categoryId) {
-    query += ' AND (k.id = ? OR k.parent_id = ?)';
-    queryParams.push(categoryId, categoryId);
-  }
-
-  if (searchQuery) {
-    query += ' AND a.naziv LIKE ?';
-    queryParams.push(`%${searchQuery}%`);
-  }
-
-  if (productCode) {
-    query += ' AND a.sifra LIKE ?';
-    queryParams.push(`%${productCode}%`);
-  }
-
-  const [rows] = await pool.query(query, queryParams);
-  return rows[0].total;
 }

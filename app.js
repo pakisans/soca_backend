@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import cors from 'cors';
 import { __dirname } from './src/config/dirname.js';
 import path from 'path';
+import { requestLogger } from './src/config/logger.js';
 
 const corsOptions = {
   origin: 'http://localhost:3000',
@@ -19,6 +20,7 @@ const port = process.env.PORT || 3001;
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
 app.use(express.json());
+app.use(requestLogger);
 app.use(morgan('dev'));
 app.use(cors(corsOptions));
 
