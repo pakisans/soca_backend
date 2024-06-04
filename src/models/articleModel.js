@@ -13,6 +13,48 @@ export async function getArticle(id) {
   return rows[0];
 }
 
+export async function getArticleByName(naziv) {
+  const query = `
+    SELECT * FROM artikli
+    WHERE LOWER(REPLACE(naziv, ' ', '-')) = LOWER(?)
+  `;
+
+  console.log('Executing query:', query); // Debugging
+  console.log('Query params:', [naziv]); // Debugging
+
+  const [rows] = await pool.query(query, [naziv]);
+
+  console.log('Query result:', rows); // Debugging
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const article = rows[0];
+
+  let imageUrl;
+  if (article.slika.includes('.jpg')) {
+    const imageName = article.slika.substring(
+      0,
+      article.slika.indexOf('.jpg') + 4,
+    );
+    imageUrl = `/images/slikepvp/${imageName}`;
+  } else {
+    const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
+    imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
+  }
+
+  console.log('Final article object:', {
+    ...article,
+    imageUrl,
+  }); // Debugging
+
+  return {
+    ...article,
+    imageUrl,
+  };
+}
+
 export async function getArticlesWithInvalidImage() {
   const query = `
         SELECT * 
@@ -69,33 +111,34 @@ export async function getArticlesByCategory({
     WHERE 1=1
   `;
   const queryParams = [];
-  console.log('off', categoryName, groupName);
+
   if (categoryName) {
-    query += ' AND k.naziv = ?';
+    query += ' AND LOWER(k.naziv) = LOWER(?)';
     queryParams.push(categoryName);
   }
 
   if (groupName) {
-    query += ' AND kg.naziv = ?';
+    query += ' AND LOWER(kg.naziv) = LOWER(?)';
     queryParams.push(groupName);
   }
 
   query += ' LIMIT ? OFFSET ?';
   queryParams.push(limit, offset);
 
+  console.log('SQL Query:', query);
+  console.log('Query Params:', queryParams);
+
   const [rows] = await pool.query(query, queryParams);
 
   const articlesWithImageUrl = rows.map((article) => {
     let imageUrl;
     if (article.slika.includes('.jpg')) {
-      // Ako slika već sadrži .jpg, koristi samo deo pre prvog .jpg
       const imageName = article.slika.substring(
         0,
         article.slika.indexOf('.jpg') + 4,
       );
       imageUrl = `/images/slikepvp/${imageName}`;
     } else {
-      // Ako slika ne sadrži .jpg, koristi celu vrednost i dodaj cleanedName
       const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
       imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
     }
@@ -104,5 +147,70 @@ export async function getArticlesByCategory({
       imageUrl,
     };
   });
+
   return articlesWithImageUrl;
+}
+
+export async function getArticleById(id) {
+  const [rows] = await pool.query('SELECT * FROM artikli WHERE id = ?', [id]);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const article = rows[0];
+
+  let imageUrl;
+  if (article.slika.includes('.jpg')) {
+    const imageName = article.slika.substring(
+      0,
+      article.slika.indexOf('.jpg') + 4,
+    );
+    imageUrl = `/images/slikepvp/${imageName}`;
+  } else {
+    const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
+    imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
+  }
+
+  return {
+    ...article,
+    imageUrl,
+  };
+}
+
+export async function getAllArticles({ page, limit }) {
+  const offset = (page - 1) * limit;
+  const [rows] = await pool.query(
+    `SELECT a.*, kg.naziv AS grupa, 
+            REPLACE(kg.parent_group_name, ' ', '-') AS kategorija
+     FROM artikli a
+     LEFT JOIN kategorije_grupe kg ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
+     LIMIT ? OFFSET ?`,
+    [limit, offset],
+  );
+  const [totalCountRows] = await pool.query(
+    'SELECT COUNT(*) as total FROM artikli',
+  );
+
+  const totalCount = totalCountRows[0].total;
+
+  const articlesWithImageUrl = rows.map((article) => {
+    let imageUrl;
+    if (article.slika.includes('.jpg')) {
+      const imageName = article.slika.substring(
+        0,
+        article.slika.indexOf('.jpg') + 4,
+      );
+      imageUrl = `/images/slikepvp/${imageName}`;
+    } else {
+      const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
+      imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
+    }
+    return {
+      ...article,
+      imageUrl,
+    };
+  });
+
+  return { articles: articlesWithImageUrl, total: totalCount };
 }

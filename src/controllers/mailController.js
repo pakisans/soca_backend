@@ -10,7 +10,7 @@ export const sendEmail = async (req, res) => {
   try {
     await transporter.sendMail({
       from: email,
-      to: 'soca@soca.rs',
+      to: 'pakisakac@gmail.com',
       subject: subject,
       text: message,
     });
@@ -58,7 +58,7 @@ export const reportFault = (req, res) => {
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'soca@soca.rs',
+      to: 'pakisakac@gmail.com',
       subject: 'Nova prijava kvara',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px;">
@@ -130,4 +130,61 @@ export const reportFault = (req, res) => {
       res.status(500).json({ message: 'Slanje prijave nije uspelo' });
     }
   });
+};
+
+export const sendCartEmail = async (req, res) => {
+  const { name, email, phone, message, artikalPodaci, ukupnaCena } = req.body;
+
+  const itemsHtml = artikalPodaci
+    .map(
+      (item) => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.name}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.category}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.grupa}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.sifra}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.price} RSD</td>
+      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.kolicina}</td>
+    </tr>
+  `,
+    )
+    .join('');
+
+  const mailOptions = {
+    from: email,
+    to: 'pakisakac@gmail.com',
+    subject: 'Nova porudžbina',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px;">
+        <h2 style="color: #8E1B13; text-align: center;">Nova porudžbina</h2>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <tr style="background-color: #1C3738; color: #ffffff;">
+            <th style="padding: 12px; text-align: left;">Naziv</th>
+            <th style="padding: 12px; text-align: left;">Kategorija</th>
+            <th style="padding: 12px; text-align: left;">Grupa</th>
+            <th style="padding: 12px; text-align: left;">Šifra</th>
+            <th style="padding: 12px; text-align: left;">Cena</th>
+            <th style="padding: 12px; text-align: left;">Količina</th>
+          </tr>
+          ${itemsHtml}
+          <tr>
+            <td colspan="4" style="padding: 12px; text-align: right; border-top: 1px solid #dddddd; font-weight: bold;">Ukupna cena:</td>
+            <td colspan="2" style="padding: 12px; border-top: 1px solid #dddddd; color: #8E1B13; font-weight: bold;">${ukupnaCena} RSD</td>
+          </tr>
+        </table>
+        <p style="margin-top: 20px;"><strong>Ime i Prezime:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Telefon:</strong> ${phone}</p>
+        <p><strong>Poruka:</strong> ${message}</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ message: 'Error sending email' });
+  }
 };

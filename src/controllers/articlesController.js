@@ -1,32 +1,6 @@
 import { logger } from '../config/logger.js';
 import * as ArticleModel from '../models/articleModel.js';
 
-export async function getAllArticles(req, res) {
-  try {
-    const articles = await ArticleModel.getArticles();
-    const response = {
-      count: articles.length,
-      articles: articles,
-    };
-    res.json(response);
-  } catch (error) {
-    res.status(500).send(error.message);
-  }
-}
-
-export async function getSingleArticle(req, res) {
-  try {
-    const article = await ArticleModel.getArticle(req.params.id);
-    if (article) {
-      res.json(article);
-    } else {
-      res.status(404).send('Article not found');
-    }
-  } catch (error) {
-    res.status(500).send(error.message);
-  }
-}
-
 export async function getArticlesWithoutProperImage(req, res) {
   try {
     const articles = await ArticleModel.getArticlesWithInvalidImage();
@@ -46,18 +20,27 @@ export async function getArticlesWithoutProperImage(req, res) {
 export async function getArticlesByCategory(req, res) {
   try {
     let { kategorija, grupa, page = 1, limit = 20 } = req.query;
-    kategorija = decodeURIComponent(kategorija || '').toLowerCase();
-    grupa = decodeURIComponent(grupa || '').toLowerCase();
+    kategorija = decodeURIComponent(kategorija || '')
+      .toLowerCase()
+      .replace(/-/g, ' ');
+    grupa = decodeURIComponent(grupa || '')
+      .toLowerCase()
+      .replace(/-/g, ' ');
+
+    if (kategorija === 'mka mali kućni aparati') {
+      kategorija = 'mka-mali kućni aparati';
+    }
+
     const articles = await ArticleModel.getArticlesByCategory({
-      categoryName: kategorija.replace(/-/g, ' '),
-      groupName: grupa.replace(/-/g, ' '),
+      categoryName: kategorija,
+      groupName: grupa,
       page: parseInt(page),
       limit: parseInt(limit),
     });
 
     const totalArticles = await ArticleModel.getTotalArticlesCount({
-      categoryName: kategorija.replace(/-/g, ' '),
-      groupName: grupa.replace(/-/g, ' '),
+      categoryName: kategorija,
+      groupName: grupa,
     });
 
     const response = {
@@ -69,9 +52,67 @@ export async function getArticlesByCategory(req, res) {
 
     res.json(response);
   } catch (error) {
-    logger.error('Error in getAllArticles: ', error);
+    console.error('Error in getArticlesByCategory:', error);
     res.status(500).send({
       message: 'Error fetching articles by category',
+      error: error.message,
+    });
+  }
+}
+
+export async function getSingleArticle(req, res) {
+  try {
+    const naziv = decodeURIComponent(req.params.naziv)
+      .replace(/-/g, '-')
+      .toLowerCase();
+    const article = await ArticleModel.getArticleByName(naziv);
+    if (article) {
+      res.json(article);
+    } else {
+      res.status(404).send('Article not found');
+    }
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+}
+
+export async function getArticle(req, res) {
+  console.log('IDkurac', req.query.id);
+  try {
+    const article = await ArticleModel.getArticleById(req.query.id);
+    if (article) {
+      res.json(article);
+    } else {
+      res.status(404).send('Article not found');
+    }
+  } catch (error) {
+    console.log('IDkurac', req.query.id);
+    res.status(500).send(error.message);
+  }
+}
+
+export async function getAllArticlesWithPagination(req, res) {
+  try {
+    let { page = 1, limit = 20 } = req.query;
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
+
+    const { articles, total } = await ArticleModel.getAllArticles({
+      page,
+      limit,
+    });
+
+    const response = {
+      count: total,
+      articles: articles,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+    };
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).send({
+      message: 'Error fetching articles',
       error: error.message,
     });
   }
