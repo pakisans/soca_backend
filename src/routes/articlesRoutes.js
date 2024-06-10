@@ -8,6 +8,10 @@ router.get(
   '/articles/invalid-image',
   ArticlesController.getArticlesWithoutProperImage,
 );
+router.get(
+  '/articles/category/group',
+  ArticlesController.getArticlesByCategoryAndGroup,
+);
 router.get('/articles/category', ArticlesController.getArticlesByCategory);
 router.get('/article/:naziv', ArticlesController.getSingleArticle);
 router.get('/article', ArticlesController.getArticle);

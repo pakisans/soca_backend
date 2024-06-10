@@ -96,7 +96,7 @@ export async function getTotalArticlesCount({ categoryName, groupName }) {
   return rows[0].total;
 }
 
-export async function getArticlesByCategory({
+export async function getArticlesByCategoryAndGroup({
   categoryName,
   groupName,
   page,
@@ -151,6 +151,47 @@ export async function getArticlesByCategory({
   return articlesWithImageUrl;
 }
 
+export async function getArticlesByCategory({ categoryName, page, limit }) {
+  const offset = (page - 1) * limit;
+  let query = `
+    SELECT a.*
+    FROM artikli a
+    LEFT JOIN kategorije k ON a.kategorija_id = k.id
+    WHERE 1=1
+  `;
+  const queryParams = [];
+
+  if (categoryName) {
+    query += ' AND LOWER(k.naziv) = LOWER(?)';
+    queryParams.push(categoryName);
+  }
+
+  query += ' LIMIT ? OFFSET ?';
+  queryParams.push(limit, offset);
+
+  const [rows] = await pool.query(query, queryParams);
+
+  const articlesWithImageUrl = rows.map((article) => {
+    let imageUrl;
+    if (article.slika.includes('.jpg')) {
+      const imageName = article.slika.substring(
+        0,
+        article.slika.indexOf('.jpg') + 4,
+      );
+      imageUrl = `/images/slikepvp/${imageName}`;
+    } else {
+      const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
+      imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
+    }
+    return {
+      ...article,
+      imageUrl,
+    };
+  });
+
+  return articlesWithImageUrl;
+}
+
 export async function getArticleById(id) {
   const [rows] = await pool.query('SELECT * FROM artikli WHERE id = ?', [id]);
 
@@ -178,21 +219,23 @@ export async function getArticleById(id) {
   };
 }
 
-export async function getAllArticles({ page, limit }) {
+export async function getAllArticles({ page, limit, search }) {
   const offset = (page - 1) * limit;
+  const searchQuery = search ? `%${search}%` : '%';
+
   const [rows] = await pool.query(
     `SELECT a.*, kg.naziv AS grupa, 
             REPLACE(kg.parent_group_name, ' ', '-') AS kategorija
      FROM artikli a
      LEFT JOIN kategorije_grupe kg ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
+     WHERE a.sifra LIKE ? OR a.naziv LIKE ?
      LIMIT ? OFFSET ?`,
-    [limit, offset],
+    [searchQuery, searchQuery, limit, offset],
   );
-  const [totalCountRows] = await pool.query(
-    'SELECT COUNT(*) as total FROM artikli',
+  const [[{ total }]] = await pool.query(
+    'SELECT COUNT(*) as total FROM artikli WHERE sifra LIKE ? OR naziv LIKE ?',
+    [searchQuery, searchQuery],
   );
-
-  const totalCount = totalCountRows[0].total;
 
   const articlesWithImageUrl = rows.map((article) => {
     let imageUrl;
@@ -212,5 +255,5 @@ export async function getAllArticles({ page, limit }) {
     };
   });
 
-  return { articles: articlesWithImageUrl, total: totalCount };
+  return { articles: articlesWithImageUrl, total };
 }

@@ -1,6 +1,9 @@
 import transporter from '../config/mailer.js';
 import multer from 'multer';
 import fs from 'fs';
+import path from 'path';
+import { generateCsv } from '../utils/csvUtil.js';
+import { fileURLToPath } from 'url';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -139,52 +142,127 @@ export const sendCartEmail = async (req, res) => {
     .map(
       (item) => `
     <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.name}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.category}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.grupa}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.sifra}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.price} RSD</td>
-      <td style="padding: 12px; border-bottom: 1px solid #dddddd;">${item.kolicina}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${item.name}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${item.sifra}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${item.price} RSD</td>
+      <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${item.kolicina}</td>
     </tr>
   `,
     )
     .join('');
 
+  const csvData = generateCsv(artikalPodaci, ukupnaCena);
+
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  const csvFilePath = path.join(__dirname, 'order.csv');
+
+  fs.writeFileSync(csvFilePath, csvData);
+
+  const mailOptions = {
+    from: email,
+    to: 'soca@soca.rs',
+    subject: 'Nova porudžbina',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 670px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        <h2 style="color: #8E1B13; text-align: center; margin-bottom: 20px;">Nova porudžbina</h2>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <thead>
+            <tr style="background-color: #1C3738; color: #ffffff;">
+              <th style="padding: 12px; text-align: left; border: 1px solid #dddddd;">Naziv</th>
+              <th style="padding: 12px; text-align: left; border: 1px solid #dddddd;">Šifra</th>
+              <th style="padding: 12px; text-align: left; border: 1px solid #dddddd;">Cena</th>
+              <th style="padding: 12px; text-align: left; border: 1px solid #dddddd;">Količina</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+        <div style="padding: 12px; text-align: right; border-top: 1px solid #dddddd; margin-top: 10px; font-weight: bold; color: #8E1B13;">
+          Ukupna cena: ${ukupnaCena} RSD
+        </div>
+        <div style="margin-top: 20px;">
+          <p style="margin: 5px 0;"><strong>Ime i Prezime:</strong> ${name}</p>
+          <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 5px 0;"><strong>Telefon:</strong> ${phone}</p>
+          <p style="margin: 5px 0;"><strong>Poruka:</strong> ${message}</p>
+        </div>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: `porudžbina-${name}-${phone}.csv`,
+        path: csvFilePath,
+        contentType: 'text/csv',
+      },
+    ],
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'Email sent successfully' });
+    // Obriši CSV fajl nakon slanja emaila
+    fs.unlinkSync(csvFilePath);
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ message: 'Error sending email' });
+    // Osiguraj brisanje CSV fajla čak i ako dođe do greške
+    fs.unlinkSync(csvFilePath);
+  }
+};
+
+export const sendInquiry = async (req, res) => {
+  const { name, email, phone, description, articleName, articleCode } =
+    req.body;
+
   const mailOptions = {
     from: email,
     to: 'pakisakac@gmail.com',
-    subject: 'Nova porudžbina',
+    subject: `Upit za nabavku proizvoda: ${articleName}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px;">
-        <h2 style="color: #8E1B13; text-align: center;">Nova porudžbina</h2>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px;">
+        <h2 style="color: #8E1B13; text-align: center;">Upit za nabavku proizvoda</h2>
         <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
           <tr style="background-color: #1C3738; color: #ffffff;">
-            <th style="padding: 12px; text-align: left;">Naziv</th>
-            <th style="padding: 12px; text-align: left;">Kategorija</th>
-            <th style="padding: 12px; text-align: left;">Grupa</th>
-            <th style="padding: 12px; text-align: left;">Šifra</th>
-            <th style="padding: 12px; text-align: left;">Cena</th>
-            <th style="padding: 12px; text-align: left;">Količina</th>
+            <th style="padding: 10px; text-align: left;">Polje</th>
+            <th style="padding: 10px; text-align: left;">Vrednost</th>
           </tr>
-          ${itemsHtml}
           <tr>
-            <td colspan="4" style="padding: 12px; text-align: right; border-top: 1px solid #dddddd; font-weight: bold;">Ukupna cena:</td>
-            <td colspan="2" style="padding: 12px; border-top: 1px solid #dddddd; color: #8E1B13; font-weight: bold;">${ukupnaCena} RSD</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">Ime i prezime</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">Email</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">Telefon</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${phone}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">Proizvod</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${articleName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">Šifra proizvoda</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${articleCode}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">Opis upita</td>
+            <td style="padding: 10px; border-bottom: 1px solid #dddddd;">${description}</td>
           </tr>
         </table>
-        <p style="margin-top: 20px;"><strong>Ime i Prezime:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Telefon:</strong> ${phone}</p>
-        <p><strong>Poruka:</strong> ${message}</p>
       </div>
     `,
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: 'Email sent successfully' });
+    res.status(200).json({ message: 'Upit je uspešno poslat!' });
   } catch (error) {
     console.error('Error sending email:', error);
-    res.status(500).json({ message: 'Error sending email' });
+    res.status(500).json({ message: 'Greška prilikom slanja upita' });
   }
 };
