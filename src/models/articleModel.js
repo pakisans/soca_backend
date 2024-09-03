@@ -19,12 +19,7 @@ export async function getArticleByName(naziv) {
     WHERE LOWER(REPLACE(naziv, ' ', '-')) = LOWER(?)
   `;
 
-  console.log('Executing query:', query); // Debugging
-  console.log('Query params:', [naziv]); // Debugging
-
   const [rows] = await pool.query(query, [naziv]);
-
-  console.log('Query result:', rows); // Debugging
 
   if (rows.length === 0) {
     return null;
@@ -43,11 +38,6 @@ export async function getArticleByName(naziv) {
     const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
     imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
   }
-
-  console.log('Final article object:', {
-    ...article,
-    imageUrl,
-  }); // Debugging
 
   return {
     ...article,
@@ -101,6 +91,7 @@ export async function getArticlesByCategoryAndGroup({
   groupName,
   page,
   limit,
+  sort,
 }) {
   const offset = (page - 1) * limit;
   let query = `
@@ -122,11 +113,23 @@ export async function getArticlesByCategoryAndGroup({
     queryParams.push(groupName);
   }
 
+  if (sort) {
+    if (sort === 'price-asc') {
+      query += ' ORDER BY CAST(a.cena AS UNSIGNED) ASC';
+    } else if (sort === 'price-desc') {
+      query += ' ORDER BY CAST(a.cena AS UNSIGNED) DESC';
+    } else if (sort === 'name-asc') {
+      query += ' ORDER BY a.naziv ASC';
+    } else if (sort === 'name-desc') {
+      query += ' ORDER BY a.naziv DESC';
+    } else if (sort === 'relevance') {
+      query +=
+        ' ORDER BY (CASE WHEN a.cena > 0 THEN 1 ELSE 0 END) DESC, a.cena DESC';
+    }
+  }
+
   query += ' LIMIT ? OFFSET ?';
   queryParams.push(limit, offset);
-
-  console.log('SQL Query:', query);
-  console.log('Query Params:', queryParams);
 
   const [rows] = await pool.query(query, queryParams);
 
@@ -151,7 +154,12 @@ export async function getArticlesByCategoryAndGroup({
   return articlesWithImageUrl;
 }
 
-export async function getArticlesByCategory({ categoryName, page, limit }) {
+export async function getArticlesByCategory({
+  categoryName,
+  page,
+  limit,
+  sort,
+}) {
   const offset = (page - 1) * limit;
   let query = `
     SELECT a.*
@@ -164,6 +172,21 @@ export async function getArticlesByCategory({ categoryName, page, limit }) {
   if (categoryName) {
     query += ' AND LOWER(k.naziv) = LOWER(?)';
     queryParams.push(categoryName);
+  }
+
+  if (sort) {
+    if (sort === 'price-asc') {
+      query += ' ORDER BY CAST(a.cena AS UNSIGNED) ASC';
+    } else if (sort === 'price-desc') {
+      query += ' ORDER BY CAST(a.cena AS UNSIGNED) DESC';
+    } else if (sort === 'name-asc') {
+      query += ' ORDER BY a.naziv ASC';
+    } else if (sort === 'name-desc') {
+      query += ' ORDER BY a.naziv DESC';
+    } else if (sort === 'relevance') {
+      query +=
+        ' ORDER BY (CASE WHEN a.cena > 0 THEN 1 ELSE 0 END) DESC, a.cena DESC';
+    }
   }
 
   query += ' LIMIT ? OFFSET ?';
@@ -219,22 +242,54 @@ export async function getArticleById(id) {
   };
 }
 
-export async function getAllArticles({ page, limit, search }) {
+export async function getAllArticles({ page, limit, search, sort, partner }) {
   const offset = (page - 1) * limit;
   const searchQuery = search ? `%${search}%` : '%';
+  const partnerQuery = partner ? `%${parseInt(partner, 10)}%` : '%';
 
-  const [rows] = await pool.query(
-    `SELECT a.*, kg.naziv AS grupa, 
-            REPLACE(kg.parent_group_name, ' ', '-') AS kategorija
-     FROM artikli a
-     LEFT JOIN kategorije_grupe kg ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
-     WHERE a.sifra LIKE ? OR a.naziv LIKE ?
-     LIMIT ? OFFSET ?`,
-    [searchQuery, searchQuery, limit, offset],
-  );
+  let query = `
+    SELECT a.*, kg.naziv AS grupa, 
+           REPLACE(kg.parent_group_name, ' ', '-') AS kategorija
+    FROM artikli a
+    LEFT JOIN kategorije_grupe kg ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
+    WHERE a.sifra LIKE ? OR a.naziv LIKE ?
+  `;
+
+  const queryParams = [searchQuery, searchQuery];
+
+  if (partner) {
+    const partnerQuery = partner.toString();
+    query += ` AND SUBSTRING_INDEX(a.sifra, '.', -1) = ?`;
+    queryParams.push(partnerQuery);
+  }
+
+  if (sort) {
+    if (sort === 'price-asc') {
+      query += ' ORDER BY CAST(a.cena AS UNSIGNED) ASC';
+    } else if (sort === 'price-desc') {
+      query += ' ORDER BY CAST(a.cena AS UNSIGNED) DESC';
+    } else if (sort === 'name-asc') {
+      query += ' ORDER BY a.naziv ASC';
+    } else if (sort === 'name-desc') {
+      query += ' ORDER BY a.naziv DESC';
+    } else if (sort === 'relevance') {
+      query +=
+        ' ORDER BY (CASE WHEN a.cena > 0 THEN 1 ELSE 0 END) DESC, a.cena DESC';
+    }
+  }
+
+  query += ' LIMIT ? OFFSET ?';
+  queryParams.push(limit, offset);
+
+  const [rows] = await pool.query(query, queryParams);
+
   const [[{ total }]] = await pool.query(
-    'SELECT COUNT(*) as total FROM artikli WHERE sifra LIKE ? OR naziv LIKE ?',
-    [searchQuery, searchQuery],
+    `SELECT COUNT(*) as total FROM artikli 
+     WHERE (sifra LIKE ? OR naziv LIKE ?)
+     ${partner ? 'AND sifra LIKE ?' : ''}`,
+    partner
+      ? [searchQuery, searchQuery, `%.${partner}`]
+      : [searchQuery, searchQuery],
   );
 
   const articlesWithImageUrl = rows.map((article) => {

@@ -1,4 +1,4 @@
-import { getAllCategoriesWithGroups } from '../models/CategoryModel.js';
+import { getAllCategoriesWithGroups } from '../models/categoryModel.js';
 
 export const getAllCategories = async (req, res) => {
   try {

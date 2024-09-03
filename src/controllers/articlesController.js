@@ -19,7 +19,7 @@ export async function getArticlesWithoutProperImage(req, res) {
 
 export async function getArticlesByCategoryAndGroup(req, res) {
   try {
-    let { kategorija, grupa, page = 1, limit = 20 } = req.query;
+    let { kategorija, grupa, page = 1, limit = 20, sort } = req.query;
     kategorija = decodeURIComponent(kategorija || '')
       .toLowerCase()
       .replace(/-/g, ' ');
@@ -36,6 +36,7 @@ export async function getArticlesByCategoryAndGroup(req, res) {
       groupName: grupa,
       page: parseInt(page),
       limit: parseInt(limit),
+      sort,
     });
 
     const totalArticles = await ArticleModel.getTotalArticlesCount({
@@ -52,9 +53,9 @@ export async function getArticlesByCategoryAndGroup(req, res) {
 
     res.json(response);
   } catch (error) {
-    console.error('Error in getArticlesByCategory:', error);
+    console.error('Error in getArticlesByCategoryAndGroup:', error);
     res.status(500).send({
-      message: 'Error fetching articles by category',
+      message: 'Error fetching articles by category and group',
       error: error.message,
     });
   }
@@ -62,7 +63,7 @@ export async function getArticlesByCategoryAndGroup(req, res) {
 
 export async function getArticlesByCategory(req, res) {
   try {
-    let { kategorija, page = 1, limit = 20 } = req.query;
+    let { kategorija, page = 1, limit = 20, sort } = req.query;
     kategorija = decodeURIComponent(kategorija || '')
       .toLowerCase()
       .replace(/-/g, ' ');
@@ -73,14 +74,13 @@ export async function getArticlesByCategory(req, res) {
 
     const articles = await ArticleModel.getArticlesByCategory({
       categoryName: kategorija,
-      groupName: grupa,
       page: parseInt(page),
       limit: parseInt(limit),
+      sort,
     });
 
     const totalArticles = await ArticleModel.getTotalArticlesCount({
       categoryName: kategorija,
-      groupName: grupa,
     });
 
     const response = {
@@ -117,7 +117,6 @@ export async function getSingleArticle(req, res) {
 }
 
 export async function getArticle(req, res) {
-  console.log('IDkurac', req.query.id);
   try {
     const article = await ArticleModel.getArticleById(req.query.id);
     if (article) {
@@ -126,14 +125,13 @@ export async function getArticle(req, res) {
       res.status(404).send('Article not found');
     }
   } catch (error) {
-    console.log('IDkurac', req.query.id);
     res.status(500).send(error.message);
   }
 }
 
 export async function getAllArticlesWithPagination(req, res) {
   try {
-    let { page = 1, limit = 20, search = '' } = req.query;
+    let { page = 1, limit = 20, search = '', sort, partner = '' } = req.query;
     page = parseInt(page, 10);
     limit = parseInt(limit, 10);
 
@@ -147,6 +145,8 @@ export async function getAllArticlesWithPagination(req, res) {
       page,
       limit,
       search,
+      sort,
+      partner,
     });
 
     const response = {

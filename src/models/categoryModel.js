@@ -22,7 +22,9 @@ export const getAllCategoriesWithGroups = async () => {
 
   const groupedCategories = categories.map((category) => ({
     ...category,
-    groups: groups.filter((group) => group.kategorija_id === category.id),
+    groups: groups
+      .filter((group) => group.kategorija_id === category.id)
+      .sort((a, b) => a.naziv.localeCompare(b.naziv)), // Sortiramo po 'naziv_kategorije'
   }));
 
   return groupedCategories;
