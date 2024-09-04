@@ -91,7 +91,7 @@ export async function getArticlesByCategoryAndGroup({
   groupName,
   page,
   limit,
-  sort,
+  sort = 'relevance',
 }) {
   const offset = (page - 1) * limit;
   let query = `
@@ -102,7 +102,7 @@ export async function getArticlesByCategoryAndGroup({
     WHERE 1=1
   `;
   const queryParams = [];
-
+  console.log('a bree', sort);
   if (categoryName) {
     query += ' AND LOWER(k.naziv) = LOWER(?)';
     queryParams.push(categoryName);
@@ -113,19 +113,32 @@ export async function getArticlesByCategoryAndGroup({
     queryParams.push(groupName);
   }
 
-  if (sort) {
-    if (sort === 'price-asc') {
-      query += ' ORDER BY CAST(a.cena AS UNSIGNED) ASC';
-    } else if (sort === 'price-desc') {
-      query += ' ORDER BY CAST(a.cena AS UNSIGNED) DESC';
-    } else if (sort === 'name-asc') {
-      query += ' ORDER BY a.naziv ASC';
-    } else if (sort === 'name-desc') {
-      query += ' ORDER BY a.naziv DESC';
-    } else if (sort === 'relevance') {
-      query +=
-        ' ORDER BY (CASE WHEN a.cena > 0 THEN 1 ELSE 0 END) DESC, a.cena DESC';
-    }
+  // Dodavanje sortiranja na osnovu dostupnosti i cene
+  const sortMapping = {
+    'price-asc': `CASE 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                    ELSE 3 
+                  END ASC, 
+                  CAST(a.prodajna_cena AS UNSIGNED) ASC`,
+    'price-desc': `CASE 
+                     WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                     WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                     ELSE 3 
+                   END ASC, 
+                   CAST(a.prodajna_cena AS UNSIGNED) DESC`,
+    'name-asc': 'a.naziv ASC',
+    'name-desc': 'a.naziv DESC',
+    relevance: `CASE 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                    ELSE 3 
+                  END ASC, 
+                  a.prodajna_cena DESC`,
+  };
+
+  if (sort && sortMapping[sort]) {
+    query += ` ORDER BY ${sortMapping[sort]}`;
   }
 
   query += ' LIMIT ? OFFSET ?';
@@ -158,7 +171,7 @@ export async function getArticlesByCategory({
   categoryName,
   page,
   limit,
-  sort,
+  sort = 'relevance',
 }) {
   const offset = (page - 1) * limit;
   let query = `
@@ -174,19 +187,32 @@ export async function getArticlesByCategory({
     queryParams.push(categoryName);
   }
 
-  if (sort) {
-    if (sort === 'price-asc') {
-      query += ' ORDER BY CAST(a.cena AS UNSIGNED) ASC';
-    } else if (sort === 'price-desc') {
-      query += ' ORDER BY CAST(a.cena AS UNSIGNED) DESC';
-    } else if (sort === 'name-asc') {
-      query += ' ORDER BY a.naziv ASC';
-    } else if (sort === 'name-desc') {
-      query += ' ORDER BY a.naziv DESC';
-    } else if (sort === 'relevance') {
-      query +=
-        ' ORDER BY (CASE WHEN a.cena > 0 THEN 1 ELSE 0 END) DESC, a.cena DESC';
-    }
+  // Dodavanje sortiranja na osnovu dostupnosti i cene
+  const sortMapping = {
+    'price-asc': `CASE 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                    ELSE 3 
+                  END ASC, 
+                  CAST(a.prodajna_cena AS UNSIGNED) ASC`,
+    'price-desc': `CASE 
+                     WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                     WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                     ELSE 3 
+                   END ASC, 
+                   CAST(a.prodajna_cena AS UNSIGNED) DESC`,
+    'name-asc': 'a.naziv ASC',
+    'name-desc': 'a.naziv DESC',
+    relevance: `CASE 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                    ELSE 3 
+                  END ASC, 
+                  a.prodajna_cena DESC`,
+  };
+
+  if (sort && sortMapping[sort]) {
+    query += ` ORDER BY ${sortMapping[sort]}`;
   }
 
   query += ' LIMIT ? OFFSET ?';
@@ -242,56 +268,79 @@ export async function getArticleById(id) {
   };
 }
 
-export async function getAllArticles({ page, limit, search, sort, partner }) {
+export async function getAllArticles({
+  page,
+  limit,
+  search,
+  sort = 'relevance',
+  partner,
+}) {
   const offset = (page - 1) * limit;
   const searchQuery = search ? `%${search}%` : '%';
-  const partnerQuery = partner ? `%${parseInt(partner, 10)}%` : '%';
+  const queryParams = [searchQuery, searchQuery];
 
   let query = `
     SELECT a.*, kg.naziv AS grupa, 
            REPLACE(kg.parent_group_name, ' ', '-') AS kategorija
     FROM artikli a
     LEFT JOIN kategorije_grupe kg ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
-    WHERE a.sifra LIKE ? OR a.naziv LIKE ?
+    WHERE (a.sifra LIKE ? OR a.naziv LIKE ?)
   `;
 
-  const queryParams = [searchQuery, searchQuery];
-
+  // Dodavanje uslova za partnera ako je prisutan
   if (partner) {
-    const partnerQuery = partner.toString();
-    query += ` AND SUBSTRING_INDEX(a.sifra, '.', -1) = ?`;
-    queryParams.push(partnerQuery);
+    query += ` AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, '.', 2), '.', -1) = ?`;
+    queryParams.push(partner.toString());
   }
 
-  if (sort) {
-    if (sort === 'price-asc') {
-      query += ' ORDER BY CAST(a.cena AS UNSIGNED) ASC';
-    } else if (sort === 'price-desc') {
-      query += ' ORDER BY CAST(a.cena AS UNSIGNED) DESC';
-    } else if (sort === 'name-asc') {
-      query += ' ORDER BY a.naziv ASC';
-    } else if (sort === 'name-desc') {
-      query += ' ORDER BY a.naziv DESC';
-    } else if (sort === 'relevance') {
-      query +=
-        ' ORDER BY (CASE WHEN a.cena > 0 THEN 1 ELSE 0 END) DESC, a.cena DESC';
-    }
+  // Dodavanje sortiranja ako je prisutno
+  const sortMapping = {
+    'price-asc': `CASE 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                    ELSE 3 
+                  END ASC, 
+                  CAST(a.prodajna_cena AS UNSIGNED) ASC`,
+    'price-desc': `CASE 
+                     WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                     WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                     ELSE 3 
+                   END ASC, 
+                   CAST(a.prodajna_cena AS UNSIGNED) DESC`,
+    'name-asc': 'a.naziv ASC',
+    'name-desc': 'a.naziv DESC',
+    relevance: `CASE 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
+                    WHEN a.aktivan = 1 AND a.kolicina > 0 THEN 2 
+                    ELSE 3 
+                  END ASC, 
+                  a.prodajna_cena DESC`,
+  };
+
+  if (sort && sortMapping[sort]) {
+    query += ` ORDER BY ${sortMapping[sort]}`;
   }
 
+  // Dodavanje limita i offseta
   query += ' LIMIT ? OFFSET ?';
   queryParams.push(limit, offset);
 
+  // Izvršavanje glavnog query-ja
   const [rows] = await pool.query(query, queryParams);
 
-  const [[{ total }]] = await pool.query(
-    `SELECT COUNT(*) as total FROM artikli 
-     WHERE (sifra LIKE ? OR naziv LIKE ?)
-     ${partner ? 'AND sifra LIKE ?' : ''}`,
-    partner
-      ? [searchQuery, searchQuery, `%.${partner}`]
-      : [searchQuery, searchQuery],
-  );
+  // Izračunavanje ukupnog broja artikala
+  const countQuery = `
+    SELECT COUNT(*) as total 
+    FROM artikli 
+    WHERE (sifra LIKE ? OR naziv LIKE ?)
+    ${partner ? 'AND SUBSTRING_INDEX(SUBSTRING_INDEX(sifra, ".", 2), ".", -1) = ?' : ''}
+  `;
+  const countParams = partner
+    ? [searchQuery, searchQuery, partner.toString()]
+    : [searchQuery, searchQuery];
+  const [[{ total }]] = await pool.query(countQuery, countParams);
 
+  // Dodavanje imageUrl za svaki artikal
   const articlesWithImageUrl = rows.map((article) => {
     let imageUrl;
     if (article.slika.includes('.jpg')) {
