@@ -1,4 +1,3 @@
-import { logger } from '../config/logger.js';
 import * as ArticleModel from '../models/articleModel.js';
 
 export async function getArticlesWithoutProperImage(req, res) {
@@ -19,7 +18,7 @@ export async function getArticlesWithoutProperImage(req, res) {
 
 export async function getArticlesByCategoryAndGroup(req, res) {
   try {
-    let { kategorija, grupa, page = 1, limit = 20, sort } = req.query;
+    let { kategorija, grupa, page = 1, limit = 20, sort, partner } = req.query;
     kategorija = decodeURIComponent(kategorija || '')
       .toLowerCase()
       .replace(/-/g, ' ');
@@ -37,6 +36,7 @@ export async function getArticlesByCategoryAndGroup(req, res) {
       page: parseInt(page),
       limit: parseInt(limit),
       sort,
+      partner
     });
 
     const totalArticles = await ArticleModel.getTotalArticlesCount({

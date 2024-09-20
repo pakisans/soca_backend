@@ -92,17 +92,18 @@ export async function getArticlesByCategoryAndGroup({
   page,
   limit,
   sort = 'relevance',
+  partner,
 }) {
   const offset = (page - 1) * limit;
   let query = `
-    SELECT a.*
+    SELECT DISTINCT a.*  -- Dodato DISTINCT da eliminise duplikate
     FROM artikli a
     LEFT JOIN kategorije_grupe kg ON a.sifra LIKE CONCAT(kg.grupa, '%')
     LEFT JOIN kategorije k ON kg.kategorija_id = k.id
     WHERE 1=1
   `;
   const queryParams = [];
-  console.log('a bree', sort);
+
   if (categoryName) {
     query += ' AND LOWER(k.naziv) = LOWER(?)';
     queryParams.push(categoryName);
@@ -111,6 +112,12 @@ export async function getArticlesByCategoryAndGroup({
   if (groupName) {
     query += ' AND LOWER(kg.naziv) = LOWER(?)';
     queryParams.push(groupName);
+  }
+
+  // Dodavanje uslova za partnera ako je prisutan
+  if (partner) {
+    query += ' AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, ".", 2), ".", -1) = ?';
+    queryParams.push(partner.toString());
   }
 
   // Dodavanje sortiranja na osnovu dostupnosti i cene
@@ -158,6 +165,7 @@ export async function getArticlesByCategoryAndGroup({
       const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
       imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
     }
+    console.log(article)
     return {
       ...article,
       imageUrl,
@@ -167,15 +175,19 @@ export async function getArticlesByCategoryAndGroup({
   return articlesWithImageUrl;
 }
 
+
+
+
 export async function getArticlesByCategory({
   categoryName,
   page,
   limit,
   sort = 'relevance',
+  partner,
 }) {
   const offset = (page - 1) * limit;
   let query = `
-    SELECT a.*
+    SELECT DISTINCT a.*  -- Dodato DISTINCT da eliminiše duplikate
     FROM artikli a
     LEFT JOIN kategorije k ON a.kategorija_id = k.id
     WHERE 1=1
@@ -187,6 +199,12 @@ export async function getArticlesByCategory({
     queryParams.push(categoryName);
   }
 
+  // Dodavanje uslova za partnera ako je prisutan
+  if (partner) {
+    query += ' AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, ".", 2), ".", -1) = ?';
+    queryParams.push(partner.toString());
+  }
+
   // Dodavanje sortiranja na osnovu dostupnosti i cene
   const sortMapping = {
     'price-asc': `CASE 
@@ -240,6 +258,7 @@ export async function getArticlesByCategory({
 
   return articlesWithImageUrl;
 }
+
 
 export async function getArticleById(id) {
   const [rows] = await pool.query('SELECT * FROM artikli WHERE id = ?', [id]);
@@ -321,14 +340,11 @@ export async function getAllArticles({
     query += ` ORDER BY ${sortMapping[sort]}`;
   }
 
-  // Dodavanje limita i offseta
   query += ' LIMIT ? OFFSET ?';
   queryParams.push(limit, offset);
 
-  // Izvršavanje glavnog query-ja
   const [rows] = await pool.query(query, queryParams);
 
-  // Izračunavanje ukupnog broja artikala
   const countQuery = `
     SELECT COUNT(*) as total 
     FROM artikli 
@@ -340,7 +356,6 @@ export async function getAllArticles({
     : [searchQuery, searchQuery];
   const [[{ total }]] = await pool.query(countQuery, countParams);
 
-  // Dodavanje imageUrl za svaki artikal
   const articlesWithImageUrl = rows.map((article) => {
     let imageUrl;
     if (article.slika.includes('.jpg')) {

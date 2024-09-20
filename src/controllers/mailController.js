@@ -13,7 +13,7 @@ export const sendEmail = async (req, res) => {
   try {
     await transporter.sendMail({
       from: email,
-      to: 'pakisakac@gmail.com',
+      to: 'servis@soca.rs',
       subject: subject,
       text: message,
     });
@@ -61,7 +61,7 @@ export const reportFault = (req, res) => {
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'pakisakac@gmail.com',
+      to: 'servis@soca.rs',
       subject: 'Nova prijava kvara',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px;">
@@ -162,7 +162,7 @@ export const sendCartEmail = async (req, res) => {
 
   const mailOptions = {
     from: email,
-    to: 'soca@soca.rs',
+    to: 'servis@soca.rs',
     subject: 'Nova porudžbina',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 670px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
@@ -219,7 +219,7 @@ export const sendInquiry = async (req, res) => {
 
   const mailOptions = {
     from: email,
-    to: 'pakisakac@gmail.com',
+    to: 'servis@soca.rs',
     subject: `Upit za nabavku proizvoda: ${articleName}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7f7ff; border-radius: 8px;">
