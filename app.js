@@ -34,14 +34,14 @@ app.use(requestLogger);
 app.use(morgan('dev'));
 app.use(cors(corsOptions));
 
-app.use('/api', articlesRoutes);
-app.use('/api', mailRoutes);
-app.use('/api', categoryRoutes);
-app.use('/api', manufacturers);
+app.use('/api-v2', articlesRoutes);
+app.use('/api-v2', mailRoutes);
+app.use('/api-v2', categoryRoutes);
+app.use('/api-v2', manufacturers);
 
 app.use(errorHandler);
 
-// app.listen(port, () => {
-//   console.log(`Server running on http://localhost:${port}`);
-// });
-app.listen();
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
+// app.listen();

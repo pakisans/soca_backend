@@ -116,7 +116,8 @@ export async function getArticlesByCategoryAndGroup({
 
   // Dodavanje uslova za partnera ako je prisutan
   if (partner) {
-    query += ' AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, ".", 2), ".", -1) = ?';
+    query +=
+      ' AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, ".", 2), ".", -1) = ?';
     queryParams.push(partner.toString());
   }
 
@@ -165,7 +166,7 @@ export async function getArticlesByCategoryAndGroup({
       const cleanedName = article.naziv.replace(/[^a-zA-Z0-9]/g, '_');
       imageUrl = `/images/slikepvp/${article.slika}_${cleanedName}.jpg`;
     }
-    console.log(article)
+    console.log(article);
     return {
       ...article,
       imageUrl,
@@ -174,9 +175,6 @@ export async function getArticlesByCategoryAndGroup({
 
   return articlesWithImageUrl;
 }
-
-
-
 
 export async function getArticlesByCategory({
   categoryName,
@@ -201,7 +199,8 @@ export async function getArticlesByCategory({
 
   // Dodavanje uslova za partnera ako je prisutan
   if (partner) {
-    query += ' AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, ".", 2), ".", -1) = ?';
+    query +=
+      ' AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, ".", 2), ".", -1) = ?';
     queryParams.push(partner.toString());
   }
 
@@ -258,7 +257,6 @@ export async function getArticlesByCategory({
 
   return articlesWithImageUrl;
 }
-
 
 export async function getArticleById(id) {
   const [rows] = await pool.query('SELECT * FROM artikli WHERE id = ?', [id]);
@@ -299,10 +297,12 @@ export async function getAllArticles({
   const queryParams = [searchQuery, searchQuery];
 
   let query = `
-    SELECT a.*, kg.naziv AS grupa, 
-           REPLACE(kg.parent_group_name, ' ', '-') AS kategorija
+    SELECT a.*, 
+          kg.seo_naziv_grupe AS grupa, 
+          kg.seo_parent AS kategorija
     FROM artikli a
-    LEFT JOIN kategorije_grupe kg ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
+    LEFT JOIN kategorije_grupe kg 
+      ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
     WHERE (a.sifra LIKE ? OR a.naziv LIKE ?)
   `;
 
@@ -358,7 +358,7 @@ export async function getAllArticles({
 
   const articlesWithImageUrl = rows.map((article) => {
     let imageUrl;
-    if (article.slika.includes('.jpg')) {
+    if (typeof article.slika === 'string' && article.slika.includes('.jpg')) {
       const imageName = article.slika.substring(
         0,
         article.slika.indexOf('.jpg') + 4,

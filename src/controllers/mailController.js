@@ -50,12 +50,14 @@ export const reportFault = (req, res) => {
       attachments.push({
         filename: req.files['image'][0].originalname,
         path: req.files['image'][0].path,
+        contentType: req.files['image'][0].mimetype,
       });
     }
     if (req.files['pdf']) {
       attachments.push({
         filename: req.files['pdf'][0].originalname,
         path: req.files['pdf'][0].path,
+        contentType: req.files['pdf'][0].mimetype,
       });
     }
 
@@ -130,13 +132,24 @@ export const reportFault = (req, res) => {
       });
     } catch (error) {
       console.error('Error sending email:', error);
-      res.status(500).json({ message: 'Slanje prijave nije uspelo' });
+      res
+        .status(500)
+        .json({ message: 'Slanje prijave nije uspelo', error: error.message });
     }
   });
 };
 
 export const sendCartEmail = async (req, res) => {
-  const { name, email, phone, message, artikalPodaci, ukupnaCena } = req.body;
+  const {
+    name,
+    email,
+    phone,
+    message,
+    artikalPodaci,
+    ukupnaCena,
+    address,
+    city,
+  } = req.body;
 
   const itemsHtml = artikalPodaci
     .map(
@@ -187,6 +200,9 @@ export const sendCartEmail = async (req, res) => {
           <p style="margin: 5px 0;"><strong>Ime i Prezime:</strong> ${name}</p>
           <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
           <p style="margin: 5px 0;"><strong>Telefon:</strong> ${phone}</p>
+          <p style="margin: 5px 0;"><strong>Grad:</strong> ${city?.value}</p>
+          <p style="margin: 5px 0;"><strong>Poštanski broj:</strong> ${city?.zip}</p>
+          <p style="margin: 5px 0;"><strong>Adresa:</strong> ${address}</p>
           <p style="margin: 5px 0;"><strong>Poruka:</strong> ${message}</p>
         </div>
       </div>
