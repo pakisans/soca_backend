@@ -293,8 +293,7 @@ export async function getAllArticles({
   partner,
 }) {
   const offset = (page - 1) * limit;
-  const searchQuery = search ? `%${search}%` : '%';
-  const queryParams = [searchQuery, searchQuery];
+  const queryParams = [];
 
   let query = `
     SELECT a.*, 
@@ -303,16 +302,25 @@ export async function getAllArticles({
     FROM artikli a
     LEFT JOIN kategorije_grupe kg 
       ON SUBSTRING_INDEX(a.sifra, '.', 1) = kg.grupa
-    WHERE (a.sifra LIKE ? OR a.naziv LIKE ?)
+    WHERE 1=1
   `;
 
-  // Dodavanje uslova za partnera ako je prisutan
+  // Ako postoji search string
+  if (search) {
+    const terms = search.split(' ');
+    for (const term of terms) {
+      query += ` AND (a.naziv LIKE ? OR a.opis LIKE ? OR a.sifra LIKE ?)`;
+      const likeTerm = `%${term}%`;
+      queryParams.push(likeTerm, likeTerm, likeTerm);
+    }
+  }
+
   if (partner) {
     query += ` AND SUBSTRING_INDEX(SUBSTRING_INDEX(a.sifra, '.', 2), '.', -1) = ?`;
     queryParams.push(partner.toString());
   }
 
-  // Dodavanje sortiranja ako je prisutno
+  // sortiranje (isto kao kod tebe)
   const sortMapping = {
     'price-asc': `CASE 
                     WHEN a.aktivan = 1 AND a.kolicina > 0 AND a.prodajna_cena > 0 THEN 1 
@@ -345,17 +353,25 @@ export async function getAllArticles({
 
   const [rows] = await pool.query(query, queryParams);
 
-  const countQuery = `
-    SELECT COUNT(*) as total 
-    FROM artikli 
-    WHERE (sifra LIKE ? OR naziv LIKE ?)
-    ${partner ? 'AND SUBSTRING_INDEX(SUBSTRING_INDEX(sifra, ".", 2), ".", -1) = ?' : ''}
-  `;
-  const countParams = partner
-    ? [searchQuery, searchQuery, partner.toString()]
-    : [searchQuery, searchQuery];
+  // count query
+  let countQuery = `SELECT COUNT(*) as total FROM artikli WHERE 1=1`;
+  const countParams = [];
+  if (search) {
+    const terms = search.split(' ');
+    for (const term of terms) {
+      countQuery += ` AND (naziv LIKE ? OR opis LIKE ? OR sifra LIKE ?)`;
+      const likeTerm = `%${term}%`;
+      countParams.push(likeTerm, likeTerm, likeTerm);
+    }
+  }
+  if (partner) {
+    countQuery += ` AND SUBSTRING_INDEX(SUBSTRING_INDEX(sifra, '.', 2), '.', -1) = ?`;
+    countParams.push(partner.toString());
+  }
+
   const [[{ total }]] = await pool.query(countQuery, countParams);
 
+  // image url
   const articlesWithImageUrl = rows.map((article) => {
     let imageUrl;
     if (typeof article.slika === 'string' && article.slika.includes('.jpg')) {
