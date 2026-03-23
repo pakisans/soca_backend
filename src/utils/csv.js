@@ -1,6 +1,6 @@
 import { createObjectCsvStringifier } from 'csv-writer';
 
-export const generateCsv = (artikalPodaci, ukupnaCena) => {
+export function generateCsv(artikalPodaci, ukupnaCena) {
   const csvStringifier = createObjectCsvStringifier({
     header: [
       { id: 'name', title: 'Naziv' },
@@ -27,12 +27,7 @@ export const generateCsv = (artikalPodaci, ukupnaCena) => {
     ],
   });
 
-  const totalRecord = [
-    {
-      label: 'Ukupna cena',
-      value: `${ukupnaCena} RSD`,
-    },
-  ];
+  const totalRecord = [{ label: 'Ukupna cena', value: `${ukupnaCena} RSD` }];
 
   return csvContent + '\n' + totalCsvStringifier.stringifyRecords(totalRecord);
-};
+}

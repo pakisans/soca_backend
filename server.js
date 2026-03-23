@@ -1,4 +1,8 @@
-const expressApp = require('./app.js').default;
+import { config } from './src/config/index.js';
+import app from './app.js';
 
+const port = config.port;
 
-expressApp.listen();
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});

@@ -1,47 +1,44 @@
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import express from 'express';
-import articlesRoutes from './src/routes/articlesRoutes.js';
-import mailRoutes from './src/routes/mailRoutes.js';
-import categoryRoutes from './src/routes/categoryRoutes.js';
-import manufacturers from './src/routes/manufacturers.js';
-import errorHandler from './src/middlewares/errorHandler.js';
-import morgan from 'morgan';
 import cors from 'cors';
-import { __dirname } from './src/config/dirname.js';
-import path from 'path';
-import { requestLogger } from './src/config/logger.js';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
+import { config } from './src/config/index.js';
+import { requestLogger } from './src/config/logger.js';
+import errorHandler from './src/middlewares/errorHandler.js';
+
+import articlesRoutes from './src/modules/articles/articles.routes.js';
+import categoriesRoutes from './src/modules/categories/categories.routes.js';
+import manufacturersRoutes from './src/modules/manufacturers/manufacturers.routes.js';
+import mailRoutes from './src/modules/mail/mail.routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const app = express();
+
+app.use(helmet());
+
+app.use('/images', express.static(join(__dirname, 'images')));
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.max,
   message: 'Too many requests from this IP, please try again later.',
 });
 
-const corsOptions = {
-  origin: 'http://localhost:3000',
-  optionsSuccessStatus: 200,
-};
-
-const app = express();
-const port = process.env.PORT || 3001;
-
-app.use('/images', express.static(path.join(__dirname, 'images')));
-app.use(helmet());
-app.use(apiLimiter);
+app.use(cors({ origin: config.cors.origin, optionsSuccessStatus: 200 }));
 app.use(express.json());
 app.use(requestLogger);
-app.use(morgan('dev'));
-app.use(cors(corsOptions));
 
+app.use('/api-v2', apiLimiter);
 app.use('/api-v2', articlesRoutes);
+app.use('/api-v2', categoriesRoutes);
+app.use('/api-v2', manufacturersRoutes);
 app.use('/api-v2', mailRoutes);
-app.use('/api-v2', categoryRoutes);
-app.use('/api-v2', manufacturers);
 
 app.use(errorHandler);
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
-// app.listen();
+export default app;
